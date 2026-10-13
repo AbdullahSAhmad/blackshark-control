@@ -1,0 +1,3 @@
+# Razer BlackShark V2 Pro 2.4 GHz dongle: give the logged-in user access to
+# the headset's vendor control interface (used by BlackShark Control).
+SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="1532", ATTRS{idProduct}=="0555", TAG+="uaccess"
