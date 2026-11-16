@@ -27,6 +27,7 @@ A Linux app for the **Razer BlackShark V2 Pro** wireless headset. Razer Synapse 
   - **Off**: the raw mic
 - A **Test mic** button with a live waveform of what apps actually hear
 - Mic gain, volume, and the audio profile (analog / digital)
+- **Wheel step**: how many percent one notch of the headset's volume wheel changes the volume (KDE Plasma 6; on Cinnamon and GNOME when the desktop has a `volume-step` setting). It is a desktop setting, so it applies to every volume key
 - A tray icon with the battery level; click it for the quick panel
 
 There's also a command-line tool:
@@ -52,7 +53,7 @@ Check yours with `lsusb | grep 1532`. Other BlackShark models use different prot
 - PipeWire with `pactl` and `parec` (`pulseaudio-utils` on Fedora)
 - [EasyEffects](https://github.com/wwmm/easyeffects) 7.x, the native (non-Flatpak) build, for voice enhancement
 - The Calf LV2 plugins (`calf-plugins`). The installer adds these on Debian, Ubuntu and Mint.
-- A tray icon needs Cinnamon (XApp), or a desktop with AppIndicator support. Without one, the app opens as a normal window.
+- A tray icon needs Cinnamon (XApp), or a desktop with AppIndicator support plus the Ayatana AppIndicator library (`libayatana-appindicator` on Arch; it provides the `AyatanaAppIndicator3` GObject typelib). Without one, the app opens as a normal window.
 
 Tested on Linux Mint 22.3 (Cinnamon), PipeWire 1.0.5, EasyEffects 7.1.6, headset firmware 2.5.
 
