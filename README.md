@@ -84,8 +84,8 @@ With voice enhancement on, apps record from **Easy Effects Source**, which the a
 ## Good to know
 
 - **Game, Music and Movie** are built into the headset's firmware and can't be read back, so the app shows them as built-in curves rather than sliders. **Custom** and the **Esports** profiles show their real curves.
-- **The volume wheel on the headset** changes volume inside the headset, and over the dongle it doesn't report its position to the computer, so the on-screen volume can't follow it.
-- **Volume is scaled in software** for this headset, the same in analog and digital mode, via a WirePlumber rule in `~/.config/wireplumber/`.
+- **The volume wheel on the headset** sends volume keys to your desktop, which changes the volume through PipeWire. This only works while PipeWire uses the dongle's hardware volume control (the analog profile, which the app selects). With a forced software volume the dongle's hardware level stays at 100 %, the headset considers itself at maximum and refuses to turn up.
+- **Volume uses the dongle's hardware control.** Earlier versions installed a WirePlumber rule that forced software volume; `install.sh` removes it. A level stored in the dongle by another host (for example Synapse on Windows) is therefore no longer a hidden ceiling.
 - **THX Spatial Audio** is proprietary Windows software and isn't available.
 
 ## How it works

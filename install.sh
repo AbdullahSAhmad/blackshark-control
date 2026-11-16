@@ -80,11 +80,12 @@ X-GNOME-Autostart-enabled=true
 EOF
 fi
 
-# Software volume for the headset (WirePlumber 0.4 reads the .lua, 0.5+ the .conf).
-mkdir -p "$HOME/.config/wireplumber/main.lua.d" "$HOME/.config/wireplumber/wireplumber.conf.d"
-cp "$HERE/data/51-blackshark-softvol.lua" "$HOME/.config/wireplumber/main.lua.d/"
-cp "$HERE/data/51-blackshark-softvol.conf" "$HOME/.config/wireplumber/wireplumber.conf.d/"
+# Older versions forced software volume. That keeps the dongle's hardware level at
+# 100 %, so the headset thinks it is at maximum and its volume wheel refuses to
+# turn up. Remove that rule; PipeWire then drives the dongle's hardware volume.
+rm -f "$HOME/.config/wireplumber/main.lua.d/51-blackshark-softvol.lua" \
+      "$HOME/.config/wireplumber/wireplumber.conf.d/51-blackshark-softvol.conf"
 
 cd "$APP" && python3 -c "from blackshark import audio; audio.install_mic_presets()"
 echo "Done. Launch 'BlackShark Control' from the menu, or run: $BIN/blackshark-ctl status"
-echo "Log out and back in (or restart PipeWire) for the volume rule to take effect."
+echo "If an older version was installed, restart WirePlumber once: systemctl --user restart wireplumber"

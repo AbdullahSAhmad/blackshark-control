@@ -25,4 +25,4 @@ if [ -f /etc/udev/rules.d/70-razer-blackshark.rules ]; then
     sudo rm -f /etc/udev/rules.d/70-razer-blackshark.rules
     sudo udevadm control --reload-rules
 fi
-echo "Uninstalled. Log out and back in to drop the volume rule."
+echo "Uninstalled."
