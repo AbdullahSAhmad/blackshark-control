@@ -315,6 +315,7 @@ class Controller:
             "firmware": None, "sidetone": 0, "preset": "custom", "bands": [0] * 10,
             "idle": None, "dnd": False,
             "mode": "off", "gain": 0, "volume": 0, "profile": None,
+            "step": audio.volume_step(),  # known up front so the window opens at full height
         }
         self.views = []
         self.worker = Worker(self._on_link, self._on_device_event)
@@ -480,12 +481,13 @@ class Controller:
     def refresh_audio(self):
         def read():
             st = dict(mode=audio.current_mic_preset(), gain=audio.mic_volume(),
-                      volume=audio.output_volume(), profile=audio.active_profile())
+                      volume=audio.output_volume(), profile=audio.active_profile(),
+                      step=audio.volume_step())
             GLib.idle_add(self._got_audio, st)
         threading.Thread(target=read, daemon=True).start()
 
     def _got_audio(self, st):
-        for key in ("gain", "volume", "mode"):
+        for key in ("gain", "volume", "mode", "step"):
             if self._touched(key, 2500):
                 st.pop(key)
         st = {k: v for k, v in st.items() if v is not None or k == "profile"}
@@ -522,6 +524,12 @@ class Controller:
         self._touch("volume")
         self.state["volume"] = pct
         self.audio_jobs.put("volume", lambda: audio.set_output_volume(pct))
+        self._render()
+
+    def set_step(self, pct):
+        self._touch("step")
+        self.state["step"] = pct
+        self.audio_jobs.put("step", lambda: audio.set_volume_step(pct))
         self._render()
 
     def set_gain(self, pct):
@@ -622,7 +630,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.ctl = ctl
         styled(self, "bs")
         self.set_icon_name("audio-headset")
-        self.set_default_size(1060, 930)
+        self.set_default_size(1060, -1)  # height follows the content, see below
         self.connect("delete-event", self._on_close)
 
         hb = styled(Gtk.HeaderBar(), "bs-head")
@@ -636,11 +644,22 @@ class MainWindow(Gtk.ApplicationWindow):
         styled(self.stack, "bs-body")
         self.add(self.stack)
         scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        # Open at the content's height so no scrollbar shows; only a screen that is
+        # too small for it falls back to scrolling.
+        scroll.set_propagate_natural_height(True)
+        scroll.set_max_content_height(self._max_content_height())
         scroll.add(self._build_main())
         self.stack.add_named(scroll, "main")
         self.stack.add_named(self._build_empty(), "empty")
         self.stack.show_all()
         hb.show_all()
+
+    @staticmethod
+    def _max_content_height():
+        """Screen height available to the window body, minus title bar and margins."""
+        display = Gdk.Display.get_default()
+        mon = display.get_primary_monitor() or display.get_monitor(0)
+        return max(400, mon.get_workarea().height - 120) if mon else 900
 
     # -- header menu --------------------------------------------------------------
 
@@ -884,6 +903,32 @@ class MainWindow(Gtk.ApplicationWindow):
         row.pack_start(self.vol, True, True, 0)
         row.pack_start(icon("speaker-loud", 20, "#a9a9b0"), False, False, 0)
         c.pack_start(row, False, False, 0)
+
+        # The wheel's step is a desktop setting; hidden where we can't change it.
+        lo, hi = audio.STEP_RANGE
+        self.step_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        # Shown from the start where supported, so the window is sized with it.
+        self.step_row.set_no_show_all(self.ctl.state["step"] is None)
+        self.step_row.set_margin_top(14)
+        step_head = Gtk.Box()
+        step_head.pack_start(label("Wheel step", "h2"), True, True, 0)
+        self.step_val = label("", "big34")
+        step_head.pack_end(self.step_val, False, False, 0)
+        self.step = make_scale(lo, hi, self.ctl.set_step)
+        # Spacers as wide as the speaker icons keep both sliders in line.
+        pads = [Gtk.Box(), Gtk.Box()]
+        for pad in pads:
+            pad.set_size_request(20, -1)
+        step_line = Gtk.Box(spacing=12)
+        step_line.pack_start(pads[0], False, False, 0)
+        step_line.pack_start(self.step, True, True, 0)
+        step_line.pack_start(pads[1], False, False, 0)
+        self.step_row.pack_start(step_head, False, False, 0)
+        self.step_row.pack_start(step_line, False, False, 0)
+        self.step_row.set_tooltip_text(
+            "How much one notch of the headset's volume wheel changes the volume. "
+            "This is a desktop setting, so it applies to every volume key.")
+        c.pack_start(self.step_row, False, False, 0)
         return c
 
     def _tile(self, ic, caption, cb):
@@ -1034,6 +1079,13 @@ class MainWindow(Gtk.ApplicationWindow):
 
         set_scale(self.vol, s["volume"])
         self.vol_val.set_text(str(s["volume"]))
+        if s["step"] is None:
+            self.step_row.hide()
+        else:
+            self.step_row.set_no_show_all(False)  # show_all() ignores it otherwise
+            self.step_row.show_all()
+        set_scale(self.step, s["step"])
+        self.step_val.set_text(f"{s['step']} %" if s["step"] is not None else "")
         self.t_off._val.set_text(dict(IDLE_STEPS).get(s["idle"], f"{s['idle']} minutes"))
         self.t_dnd._val.set_text("Do not disturb" if s["dnd"] else "Normal")
         set_class(self.t_dnd, "on", s["dnd"])

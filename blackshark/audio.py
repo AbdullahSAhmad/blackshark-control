@@ -146,6 +146,65 @@ def make_default():
         _run("pactl", "set-default-sink", sink)
 
 
+# -- Volume wheel step ---------------------------------------------------------
+#
+# The wheel only sends Volume Up / Volume Down key events. How many percent one
+# notch is worth is decided by the desktop, so "wheel sensitivity" is a desktop
+# setting. It applies to every volume key, not just the headset's.
+
+STEP_DEFAULT = 5
+STEP_RANGE = (1, 10)
+
+# (desktop name in XDG_CURRENT_DESKTOP, gsettings schema, key)
+_GSETTINGS_STEP = (
+    ("CINNAMON", "org.cinnamon.desktop.sound", "volume-step"),
+    ("GNOME", "org.gnome.settings-daemon.plugins.media-keys", "volume-step"),
+)
+
+
+def _step_backend():
+    """How to read and write the desktop's volume step: ("kde", None),
+    ("gsettings", (schema, key)) or None when this desktop isn't supported."""
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
+    if "KDE" in desktop:
+        if shutil.which("kreadconfig6") and shutil.which("kwriteconfig6"):
+            return ("kde", None)
+        return None
+    for name, schema, key in _GSETTINGS_STEP:
+        if name in desktop and key in _run("gsettings", "list-keys", schema).split():
+            return ("gsettings", (schema, key))
+    return None
+
+
+def volume_step():
+    """Percent per volume key press, or None if this desktop isn't supported."""
+    kind, arg = _step_backend() or (None, None)
+    if kind == "kde":
+        out = _run("kreadconfig6", "--file", "plasmaparc", "--group", "General",
+                   "--key", "VolumeStep", "--default", str(STEP_DEFAULT))
+    elif kind == "gsettings":
+        out = _run("gsettings", "get", *arg)
+    else:
+        return None
+    m = re.search(r"\d+", out)
+    return int(m.group()) if m else None
+
+
+def set_volume_step(pct):
+    pct = max(STEP_RANGE[0], min(STEP_RANGE[1], int(pct)))
+    kind, arg = _step_backend() or (None, None)
+    if kind == "kde":
+        _run("kwriteconfig6", "--file", "plasmaparc", "--group", "General",
+             "--key", "VolumeStep", str(pct))
+        # The shortcut service only reads the step when it loads, so reload it.
+        for method in ("unloadModule", "loadModule"):
+            _run("gdbus", "call", "--session", "--dest", "org.kde.kded6",
+                 "--object-path", "/kded", "--method", "org.kde.kded6." + method,
+                 "audioshortcutsservice")
+    elif kind == "gsettings":
+        _run("gsettings", "set", *arg, str(pct))
+
+
 # -- EasyEffects mic chain ---------------------------------------------------
 
 def easyeffects_available():
